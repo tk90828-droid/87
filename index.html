@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Taiwan Pride 🌈｜11×9 排桌表（Leader Dock + Popover）— fixed + overlay</title>
+<style>
+  :root{
+    --bg:#0A0B0F; --card:#10131A; --muted:#9AA4AF; --fg:#F2F5F8; --border:#1f2430;
+    --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444;
+    --rainbow: linear-gradient(90deg,#ff5f6d,#ffc371,#9be15d,#00e3ae,#45aaf2,#9b59b6);
+    --btn-grad: linear-gradient(90deg,#7dd3fc,#86efac);
+    --gold-grad: linear-gradient(90deg,#caa757,#f6e27a,#d4af37);
+    --colw: 100px;
+    --gap: 8px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; font-family: ui-sans-serif, system-ui, -apple-system, "Noto Sans TC", "Segoe UI", Roboto, Helvetica, Arial;
+    background:var(--bg); color:var(--fg);
+  }
+  .wrap{max-width:1200px;margin:20px auto;padding:0 16px}
+  .h{font-weight:900;font-size:20px}
+  .sub{color:var(--muted);font-size:13px}
+  .rb{height:2px;background:var(--rainbow);opacity:.6;border-radius:2px;margin:6px 0 10px}
+
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:10px 0}
+  .ctrls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .ctrls label{font-size:12px;color:var(--muted)}
+  .ctrls input[type="range"]{width:180px}
+  .hint{font-size:12px;color:var(--muted)}
+  .btn{appearance:none;border:1px solid var(--border);background:#0f1117;color:#e5e7eb;padding:6px 10px;border-radius:999px;cursor:pointer}
+  .btn.primary{background:var(--btn-grad);border:none;color:#0b1220;font-weight:800}
+  .btn.toggle[aria-pressed="true"]{outline:2px solid #3b82f6}
+
+  /* Dock */
+  .dock{margin-top:8px;border:1px solid var(--border);border-radius:14px;padding:10px;background:var(--card)}
+  .dock-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .dock-body{display:flex;flex-wrap:wrap;gap:8px;min-height:44px;padding:6px;border:1px dashed #2b3244;border-radius:10px}
+  .placeholder{color:var(--muted);font-size:12px}
+
+  /* Leader pill */
+  .pill{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#0f1117;cursor:grab;user-select:none;max-width:100%}
+  .pill:active{cursor:grabbing}
+  .pill .name{font-weight:800;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;background:var(--gold-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .pill .dot{flex:0 0 14px;margin-left:6px;width:14px;height:14px;border-radius:50%;border:2px solid #2b3244;display:inline-flex;align-items:center;justify-content:center;}
+  .pill .dot::after{content:"";width:6px;height:6px;border-radius:50%;background:#2b3244}
+
+  /* 底層 Grid（維持 11×9 以保相對位置，但做透明佈局） */
+  .grid-wrap{margin-top:12px; position:relative;}
+  .grid{--w: var(--colw);display:grid;grid-template-columns:repeat(11,var(--w));gap:var(--gap);
+        width:min(100%, calc(var(--colw)*11 + var(--gap)*10));}
+  .cell{border:1px solid transparent;border-radius:12px;padding:6px;min-height:calc(var(--colw) - 20px);
+        background:transparent;position:relative;pointer-events:none;visibility:hidden;}
+  /* ↑ 透明不可互動，只負責撐出原始網格尺寸與相對位置 */
+
+  /* 上層絕對座標舞台 */
+  .abs-stage{position:absolute; inset:0; pointer-events:none;} /* 容器 */
+  .abs-cell{
+    position:absolute; width:var(--colw); min-height:calc(var(--colw) - 20px);
+    border:1px solid var(--border); border-radius:12px; padding:6px; background:var(--card);
+    pointer-events:auto; /* 上層格子可互動拖放 */
+  }
+  .abs-cell .head{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+  .name-fixed{
+    display:inline-block;width:100%;padding:6px 8px;border-radius:8px;border:1px solid #2b3244;
+    background:#0f1117;color:#e5e7eb;font-weight:800;text-align:center;pointer-events:none;user-select:none;
+  }
+  .drop{min-height:30px;display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+  .abs-cell[data-dropzone="cell"]{outline-offset:-2px}
+  .abs-cell.dragover{outline:2px dashed #3b82f6}
+
+  /* Popover */
+  .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50}
+  .popover{width:min(560px,92vw);max-height:70vh;overflow:auto;background:#0f1117;border:1px solid #2b3244;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.5);padding:12px}
+  .po-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .po-title{font-weight:900}
+  .po-list{margin-top:8px;display:flex;flex-direction:column;gap:6px}
+  .po-item{display:flex;align-items:center;gap:8px;border:1px solid #2b3244;border-radius:10px;padding:6px 8px;background:#10131A}
+  .po-item .nm{font-weight:800}
+  .po-item .ig{font-size:12px;color:#9AA4AF;margin-left:auto}
+
+  .toast{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);background:#0f1117;border:1px solid #2b3244;color:#e5e7eb;padding:8px 12px;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.45);opacity:0;transition:opacity .25s;z-index:60}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="h">11×9 排桌表｜固定桌透明底 + 绝對座標疊放</div>
+    <div class="sub">底層完整網格維持相對位置；僅你提供的桌子在上層以絕對座標顯示（桌名=數字且鎖定）。</div>
+    <div class="rb"></div>
+
+    <div class="bar">
+      <div class="ctrls">
+        <label for="colw">欄寬</label>
+        <input id="colw" type="range" min="30" max="250" step="1" value="100" />
+        <span id="colwVal" class="hint">100px</span>
+        <button id="btnMode" class="btn toggle" aria-pressed="false" title="覆蓋 / 交換">覆蓋模式</button>
+      </div>
+      <div class="ctrls">
+        <button id="btnSave" class="btn primary">儲存（回填 number）</button>
+      </div>
+    </div>
+
+    <!-- Leader Dock -->
+    <section class="dock" aria-label="Leader Dock" id="dock">
+      <div class="dock-title">
+        <div class="h" style="font-size:16px">Leaders</div>
+        <div class="sub" id="dockCount">0 位</div>
+      </div>
+      <div class="dock-body" id="dockBody" data-dropzone="dock">
+        <div class="placeholder">將 Leader 拖曳到任一上層格子，或拖回此 Dock。</div>
+      </div>
+    </section>
+
+    <!-- 底層透明 Grid + 上層絕對座標 -->
+    <div class="grid-wrap" id="gridWrap">
+      <div class="grid" id="grid"></div>
+      <div class="abs-stage" id="absStage"></div>
+    </div>
+  </div>
+
+  <!-- Popover -->
+  <div class="backdrop" id="poBack">
+    <div class="popover" role="dialog" aria-modal="true">
+      <div class="po-head">
+        <div class="po-title" id="poTitle">成員清單</div>
+        <button class="btn" id="poClose">關閉</button>
+      </div>
+      <div class="rb"></div>
+      <div id="poList" class="po-list"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+/***** (1) 設定區 *****/
+const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbykkFpq9sT-hTXPOEsqtBTUqMDs0U7nrzO_221cr9c-E4x62IuIWblUuCOWF1C4SAHlcw/exec';
+const ROSTER_URL = 'https://docs.google.com/spreadsheets/d/1DY4TajQDdvikPfM_-A6St5CCW996NtQkclC2IG4PJ4s/gviz/tq?tqx=out:json&sheet=roster';
+
+/***** (2) 固定桌座標（X,Y, number） *****/
+const FIXED_TABLES = [
+  {x:17, y:4, number:'508'},
+  {x:341, y:5, number:'531'},
+  {x:449, y:5, number:'532'},
+  {x:557, y:5, number:'533'},
+  {x:129, y:13, number:'517'},
+  {x:237, y:13, number:'518'},
+  {x:914, y:13, number:'49'},
+  {x:1130, y:13, number:'41'},
+  {x:17, y:92, number:'507'},
+  {x:341, y:93, number:'535'},
+  {x:449, y:93, number:'536'},
+  {x:557, y:93, number:'537'},
+  {x:129, y:101, number:'516'},
+  {x:237, y:101, number:'519'},
+  {x:17, y:181, number:'506'},
+  {x:233, y:181, number:'520'},
+  {x:129, y:189, number:'515'},
+  {x:590, y:189, number:'428'},
+  {x:806, y:189, number:'430'},
+  {x:914, y:189, number:'31'},
+  {x:1130, y:189, number:'433'},
+  {x:17, y:269, number:'505'},
+  {x:158, y:277, number:'435'},
+  {x:266, y:277, number:'436'},
+  {x:374, y:277, number:'437'},
+  {x:482, y:277, number:'438'},
+  {x:590, y:277, number:'39'},
+  {x:17, y:356, number:'503'},
+  {x:233, y:356, number:'523'},
+  {x:341, y:356, number:'551'},
+];
+
+/***** (3) 快捷 *****/
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const toastBox = $('#toast');
+function toast(msg){ toastBox.textContent = msg; toastBox.classList.add('show'); setTimeout(()=>toastBox.classList.remove('show'), 1800); }
+
+/***** (4) Grid 基本參數 *****/
+const ROWS = 9, COLS = 11;
+
+/***** (5) 狀態 *****/
+const state = {
+  rows: [],
+  leaders: [],
+  membersByLeader: new Map(),
+  pos: new Map(),      // Map<leader, {type:'abs', idx:number}>  // idx = FIXED_TABLES index
+  swapMode: false
+};
+
+/***** (6) 欄名正規化 *****/
+const needKeys = ['item','number','name','ig','country','flag','leader','link','status'];
+const normKey = s => (s||'').toString().toLowerCase().replace(/\s|　|_/g,'').trim();
+
+/***** (7) 建立底層透明 Grid（只撐版用） *****/
+function buildGrid(){
+  const grid = $('#grid'); grid.innerHTML='';
+  const total = ROWS*COLS;
+  for(let i=0;i<total;i++){
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.dataset.idx = i;
+    grid.appendChild(cell);
+  }
+}
+
+/***** (8) 上層絕對座標舞台 *****/
+function buildAbsStage(){
+  const stage = $('#absStage'); stage.innerHTML='';
+  let maxRight=0, maxBottom=0;
+  const colw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--colw')) || 100;
+  const estH = Math.max(30, colw - 20) + 12 + 6; // drop區 + padding 估算
+
+  FIXED_TABLES.forEach((t, idx)=>{
+    const cell = document.createElement('div');
+    cell.className = 'abs-cell';
+    cell.style.left = t.x + 'px';
+    cell.style.top  = t.y + 'px';
+    cell.dataset.idx = String(idx);
+    cell.setAttribute('data-dropzone','cell');
+
+    const head = document.createElement('div'); head.className='head';
+    const name = document.createElement('div'); name.className='name-fixed'; name.textContent = String(t.number);
+    head.appendChild(name);
+
+    const drop = document.createElement('div'); drop.className='drop';
+    cell.append(head, drop);
+
+    // DnD
+    cell.addEventListener('dragover', (e)=>{ e.preventDefault(); cell.classList.add('dragover'); });
+    cell.addEventListener('dragleave', ()=> cell.classList.remove('dragover'));
+    cell.addEventListener('drop', (e)=>{ e.preventDefault(); cell.classList.remove('dragover'); onDropToAbs(idx, e); });
+
+    stage.appendChild(cell);
+    maxRight  = Math.max(maxRight,  t.x + colw);
+    maxBottom = Math.max(maxBottom, t.y + estH);
+  });
+
+  // 讓 gridWrap 有足夠高度容納 overlay
+  $('#gridWrap').style.minHeight = (maxBottom + 40) + 'px';
+}
+
+/***** (9) Pill *****/
+function makePill(leader){
+  const pill = document.createElement('button'); pill.type='button'; pill.className='pill'; pill.draggable=true;
+  const nm = document.createElement('span'); nm.className='name'; nm.textContent = leader;
+  const dot = document.createElement('span'); dot.className='dot'; dot.title='查看成員';
+  pill.append(nm, dot);
+  pill.addEventListener('click', (e)=>{ if(e.target===dot) openPopover(leader); });
+  dot.addEventListener('click', (e)=>{ e.stopPropagation(); openPopover(leader); });
+  pill.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', leader); e.dataTransfer.effectAllowed='move'; });
+  return pill;
+}
+
+/***** (10) Dock 渲染 *****/
+function buildDock(){
+  const body = $('#dockBody'); body.innerHTML='';
+  const list = state.leaders.filter(L => (state.pos.get(L)?.type!=='abs'));
+  if(!list.length){ const ph=document.createElement('div'); ph.className='placeholder'; ph.textContent='（目前無可用 Leader）'; body.appendChild(ph); }
+  for(const L of list){ body.appendChild(makePill(L)); }
+  $('#dockCount').textContent = `${state.leaders.length} 位`;
+
+  // Dock 作為 dropzone
+  body.addEventListener('dragover', e=>{ e.preventDefault(); });
+  body.addEventListener('drop', e=>{
+    e.preventDefault();
+    const leader=e.dataTransfer.getData('text/plain'); if(!leader) return;
+    state.pos.set(leader,{type:'dock'});
+    buildDock();
+    FIXED_TABLES.forEach((_,i)=> renderAbsCellLeader(i));
+  });
+}
+
+/***** (11) Abs cell 內的 leader 顯示 *****/
+function getLeaderAtAbs(idx){
+  for(const [L, pos] of state.pos){ if(pos.type==='abs' && pos.idx===idx) return L; }
+  return '';
+}
+function renderAbsCellLeader(idx){
+  const cell = document.querySelector(`.abs-cell[data-idx="${idx}"]`); if(!cell) return;
+  const drop = cell.querySelector('.drop'); drop.innerHTML='';
+  const L = getLeaderAtAbs(idx);
+  if(L){ drop.appendChild(makePill(L)); }
+}
+
+/***** (12) Drop 到絕對座標格（覆蓋/交換） *****/
+function onDropToAbs(idx, e){
+  const leader = e.dataTransfer.getData('text/plain'); if(!leader) return;
+  const occupied = getLeaderAtAbs(idx);
+  const src = state.pos.get(leader);
+  if(state.swapMode){
+    if(occupied){
+      if(src && src.type==='abs'){
+        const srcPos = { ...src };
+        state.pos.set(leader, {type:'abs', idx});
+        state.pos.set(occupied,{type:'abs', idx:srcPos.idx});
+        renderAbsCellLeader(idx);
+        renderAbsCellLeader(srcPos.idx);
+      }else{
+        state.pos.set(occupied,{type:'dock'}); buildDock();
+        state.pos.set(leader, {type:'abs', idx}); renderAbsCellLeader(idx);
+      }
+    }else{
+      state.pos.set(leader, {type:'abs', idx}); renderAbsCellLeader(idx);
+      if(src && src.type==='abs') renderAbsCellLeader(src.idx);
+    }
+  }else{
+    if(occupied){
+      state.pos.set(occupied,{type:'dock'}); buildDock();
+    }
+    state.pos.set(leader,{type:'abs', idx}); renderAbsCellLeader(idx);
+    if(src && src.type==='abs') renderAbsCellLeader(src.idx);
+  }
+}
+
+/***** (13) Popover *****/
+function openPopover(leader){
+  const list = state.membersByLeader.get(leader)||[];
+  $('#poTitle').textContent = `Leader：${leader}（${list.length} 人）`;
+  const box = $('#poList'); box.innerHTML='';
+  for(const r of list){
+    const row = document.createElement('div'); row.className='po-item';
+    const flag = document.createElement('div'); flag.textContent = r.flag || '—';
+    const nm = document.createElement('div'); nm.className='nm'; nm.textContent = r.name||'—';
+    const ig = document.createElement('div'); ig.className='ig'; ig.textContent = r.ig||'';
+    row.append(flag,nm,ig); box.appendChild(row);
+  }
+  $('#poBack').style.display='flex';
+}
+function closePopover(){ $('#poBack').style.display='none'; }
+$('#poClose').addEventListener('click', closePopover);
+$('#poBack').addEventListener('click', (e)=>{ if(e.target.id==='poBack') closePopover(); });
+
+/***** (14) 儲存（bulkUpdateNumber → fallback updateNumber），桌名=固定數字 *****/
+$('#btnSave').addEventListener('click', saveAll);
+async function saveAll(){
+  if(!GAS_WEB_APP_URL || GAS_WEB_APP_URL.includes('XXXXXXXX')){ toast('請先設定 GAS_WEB_APP_URL'); return; }
+  const payload = [];
+
+  FIXED_TABLES.forEach((t, idx)=>{
+    const L = getLeaderAtAbs(idx);
+    if(!L) return;
+    const members = state.membersByLeader.get(L)||[];
+    for(const m of members){
+      payload.push({ item:m.item, ig:m.ig, name:m.name, leader:L, number:String(t.number) });
+    }
+  });
+
+  if(!payload.length){ toast('沒有可儲存的格子'); return; }
+
+  const bulkBody = JSON.stringify({ action:'bulkUpdateNumber', changes: payload, sheet:'roster', ts:Date.now() });
+  let ok = await tryPost(GAS_WEB_APP_URL, bulkBody);
+  if(!ok){
+    let all = true;
+    for(const ch of payload){
+      const body = JSON.stringify({ action:'updateNumber', item: ch.item, ig:ch.ig, name:ch.name, number: ch.number, sheet:'roster', ts:Date.now() });
+      const one = await tryPost(GAS_WEB_APP_URL, body);
+      if(!one) all = false;
+    }
+    ok = all;
+  }
+  toast(ok ? '已回填 number' : '回填失敗，請稍後再試');
+}
+
+/* 共用 POST */
+async function tryPost(url, body){
+  try{
+    const res = await fetch(url, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body,
+      mode:'cors',
+      cache:'no-store'
+    });
+    const text = await res.text();
+    let json = null; try{ json = JSON.parse(text); }catch(_){}
+    if (res.ok && json && (json.ok === true || typeof json.updated === 'number' || typeof json.requested === 'number')) return true;
+    toast(`伺服器回覆：${(json? JSON.stringify(json): text).slice(0,300)}`); return false;
+  }catch(err){ toast('網路錯誤：' + err.message); return false; }
+}
+
+/***** (15) 讀 roster *****/
+async function loadRoster(){
+  const url = `${ROSTER_URL}&_=${Date.now()}`;
+  const res = await fetch(url, { cache:'no-store', mode:'cors' });
+  if(!res.ok) throw new Error(`Roster fetch failed: ${res.status} ${res.statusText}`);
+  const text = await res.text();
+  const m = text.replace(/^[\uFEFF\s]+|[\s]+$/g,'').match(/setResponse\(([\s\S]*)\)\s*;?\s*$/);
+  if(!m) throw new Error('gviz parse failed');
+  const j = JSON.parse(m[1]);
+  const cols = (j.table?.cols||[]).map(c=>c?.label||'');
+  const rows = (j.table?.rows||[]);
+  const data = rows.map(r=>{
+    const obj = {};
+    (r.c||[]).forEach((cell, i)=>{ obj[cols[i]||`c${i}`] = (cell && (cell.v ?? cell.f)) ?? ''; });
+    return obj;
+  });
+  const normalized = data.map(r=>{
+    const o = {}; for(const k of needKeys){ const hit = Object.keys(r).find(x => normKey(x) === normKey(k)); o[k] = (hit ? r[hit] : '') ?? ''; }
+    o.leader = (o.leader||'').toString().trim();
+    o.name   = (o.name  ||'').toString().trim();
+    o.ig     = (o.ig    ||'').toString().trim();
+    return o;
+  });
+
+  state.rows = normalized;
+  const map = new Map();
+  for(const row of normalized){ const key = (row.leader||'').trim(); if(!map.has(key)) map.set(key, []); map.get(key).push(row); }
+  map.delete('');
+  state.membersByLeader = map;
+  state.leaders = Array.from(map.keys()).sort((a,b)=>a.localeCompare(b));
+}
+
+/***** (16) 初始化 *****/
+async function init(){
+  const rng = $('#colw'); const val = $('#colwVal');
+  const syncColw = ()=>{
+    document.documentElement.style.setProperty('--colw', `${rng.value}px`);
+    val.textContent = `${rng.value}px`;
+    // 重建底層網格（透明）與上層絕對舞台
+    buildGrid();
+    buildAbsStage();
+    // 重新繪製已放的 leaders
+    FIXED_TABLES.forEach((_,i)=> renderAbsCellLeader(i));
+  };
+  rng.addEventListener('input', syncColw); syncColw();
+
+  $('#btnMode').addEventListener('click', (e)=>{
+    state.swapMode = !state.swapMode;
+    e.currentTarget.setAttribute('aria-pressed', String(state.swapMode));
+    e.currentTarget.textContent = state.swapMode ? '交換模式' : '覆蓋模式';
+  });
+
+  try{
+    await loadRoster();
+    buildDock();
+  }catch(err){ console.error(err); toast('名單載入失敗，請檢查權限/分頁名'); }
+}
+
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
