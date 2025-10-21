@@ -263,6 +263,7 @@ function buildGrid(){
       input.value = getTableName(i);
       input.addEventListener('input', () => {
         setTableName(i, input.value.trim());
+        updateHeadExtras(i);          // ★ 輸入桌名時判斷是否顯示人數與 +
       });
     }
 
@@ -294,6 +295,9 @@ function buildGrid(){
     cell.addEventListener('drop', (e)=>{ e.preventDefault(); cell.classList.remove('dragover'); onDropToCell(i, e); });
 
     grid.appendChild(cell);
+
+    // ★ 初次建好先判斷顯示/隱藏
+    updateHeadExtras(i);
   }
 }
 
@@ -331,12 +335,24 @@ function updateCellCount(idx){
   const badge = cell.querySelector('.head-count');
   if (badge) badge.textContent = String(cnt);
 }
+function updateHeadExtras(idx){
+  const cell = $(`.cell[data-idx="${idx}"]`); if(!cell) return;
+  const hasName = !!(cell.querySelector('.table-name')?.value || '').trim();
+  const hasLeader = !!getLeaderAtCell(idx);
+  const show = hasName || hasLeader;
+  const countEl = cell.querySelector('.head-count');
+  const plusEl  = cell.querySelector('.table-plus');
+  if (countEl) countEl.style.display = show ? '' : 'none';
+  if (plusEl)  plusEl.style.display  = show ? '' : 'none';
+  if (show) updateCellCount(idx);
+}
 function renderCellLeader(idx){
   const cell = $(`.cell[data-idx="${idx}"]`); if(!cell) return;
   const drop = cell.querySelector('.drop'); drop.innerHTML='';
   const L = getLeaderAtCell(idx);
   if(L){ drop.appendChild(makePill(L)); }
   updateCellCount(idx);
+  updateHeadExtras(idx); // ★ 放上/拿走 Leader 時同步判斷顯示
 }
 
 /***** (10) Drop 到 Cell 的邏輯（覆蓋/交換） *****/
