@@ -41,12 +41,26 @@
   .dock-body{display:flex;flex-wrap:wrap;gap:8px;min-height:44px;padding:6px;border:1px dashed #2b3244;border-radius:10px}
   .placeholder{color:var(--muted);font-size:12px}
 
-  /* Leader pill */
-  .pill{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#0f1117;cursor:grab;user-select:none;max-width:100%}
+  /* Leader pill —— 調小 pill、字級；彩虹點改在最左邊 */
+  .pill{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:4px 8px;border:1px solid var(--border);
+    border-radius:999px;background:#0f1117;cursor:grab;
+    user-select:none;max-width:100%;
+  }
   .pill:active{cursor:grabbing}
-  .pill .name{font-weight:800;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;background:var(--gold-grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-  .pill .dot{flex:0 0 14px;margin-left:6px;width:14px;height:14px;border-radius:50%;border:2px solid #2b3244;display:inline-flex;align-items:center;justify-content:center;}
-  .pill .dot::after{content:"";width:6px;height:6px;border-radius:50%;background:#2b3244}
+  .pill .name{
+    font-weight:800;flex:1;min-width:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    display:inline-block;background:var(--gold-grad);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+    font-size:12px; line-height:1.1;
+  }
+  .pill .dot{
+    flex:0 0 12px; width:12px;height:12px;border-radius:50%;
+    background:var(--rainbow); border:none; margin:0 6px 0 0; display:inline-block;
+  }
+  .pill .dot::after{ content:none; }
 
   /* Grid */
   .grid-wrap{margin-top:12px}
@@ -224,12 +238,15 @@ function buildGrid(){
   }
 }
 
-/***** (7) 產生 Pill *****/
+/***** (7) 產生 Pill —— 圈圈在左、名稱在右 *****/
 function makePill(leader){
   const pill = document.createElement('button'); pill.type='button'; pill.className='pill'; pill.draggable=true;
-  const nm = document.createElement('span'); nm.className='name'; nm.textContent = leader;
+
   const dot = document.createElement('span'); dot.className='dot'; dot.title='查看成員';
-  pill.append(nm, dot);
+  const nm  = document.createElement('span'); nm.className='name'; nm.textContent = leader;
+
+  pill.append(dot, nm);
+
   pill.addEventListener('click', (e)=>{ if(e.target===dot) openPopover(leader); });
   dot.addEventListener('click', (e)=>{ e.stopPropagation(); openPopover(leader); });
   pill.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', leader); e.dataTransfer.effectAllowed='move'; });
@@ -325,7 +342,6 @@ $('#btnAuto').addEventListener('click', ()=>{
 });
 
 /***** (12b) 依 roster 的 number 初始放置 Leader 到對應格子 *****/
-// 讀目前格子上的桌名 -> index 對照
 function mapTableNamesToIdx() {
   const cells = $$('.cell');
   const map = new Map();
@@ -336,7 +352,6 @@ function mapTableNamesToIdx() {
   }
   return map;
 }
-// 找出該 leader 成員資料中最常見且非空的 number
 function leaderPreferredNumber(leader) {
   const members = state.membersByLeader.get(leader) || [];
   const cnt = new Map();
@@ -350,12 +365,12 @@ function leaderPreferredNumber(leader) {
   for (const [k, c] of cnt) {
     if (c > bestC) { best = k; bestC = c; }
   }
-  return best; // 可能回傳 ''
+  return best;
 }
 function applyInitialPlacementByNumber() {
   const name2idx = mapTableNamesToIdx();
   const used = new Set();
-  for (const L of state.leaders) state.pos.set(L, { type: 'dock' });
+  for (const L of state.leaders) state.pos.set(L, { type:'dock' });
   for (const L of state.leaders) {
     const pref = leaderPreferredNumber(L);
     if (!pref) continue;
@@ -383,10 +398,8 @@ async function saveAll(){
     const tn = cell.querySelector('.table-name').value.trim();
     const L = getLeaderAtCell(idx);
 
-    // 沒有桌名或沒有 Leader → 不回填
     if(!tn || !L) continue;
 
-    // 只回填桌名（不附加人數）
     const value = tn.slice(0,10);
 
     const members = state.membersByLeader.get(L)||[];
@@ -455,7 +468,6 @@ async function loadRoster(){
     return obj;
   });
 
-  // 標準化欄位
   const normalized = data.map(r=>{
     const o = {}; for(const k of needKeys){ const hit = Object.keys(r).find(x => normKey(x) === normKey(k)); o[k] = (hit ? r[hit] : '') ?? ''; }
     o.leader = (o.leader||'').toString().trim();
@@ -465,7 +477,6 @@ async function loadRoster(){
   });
 
   state.rows = normalized;
-  // 分組
   const map = new Map();
   for(const row of normalized){ const key = (row.leader||'').trim(); if(!map.has(key)) map.set(key, []); map.get(key).push(row); }
   map.delete('');
@@ -487,7 +498,6 @@ async function init(){
   try{
     await loadRoster();
     buildDock();
-    // 依 roster.number 將已排好的 leader 放到對應桌名的格子
     applyInitialPlacementByNumber();
   }catch(err){ console.error(err); toast('名單載入失敗，請檢查權限/分頁名'); }
 }
