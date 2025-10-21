@@ -75,21 +75,33 @@
     min-height:0;
   }
   .table-name{
-    flex:1;                        /* 讓輸入框吃滿剩餘空間 */
+    flex:0 0 48px;                 /* 縮小：三位數字寬度 */
+    width:48px;
     padding:2px 6px;
+    text-align:center;             /* 置中顯示 */
     border-radius:8px;border:1px solid #2b3244;background:#0f1117;color:#e5e7eb;
     font-size:12px;height:24px;line-height:20px;
   }
   .table-name[readonly]{opacity:.95;font-weight:700;}
 
-  /* 桌名行右側的 + 按鈕（用與「儲存」相同的漸層） */
+  /* 人數顯示（桌名與 + 之間） */
+  .head-count{
+    min-width:18px;
+    font-size:12px;
+    color:var(--muted);
+    text-align:center;
+  }
+
+  /* 右側 + 按鈕：無外圈、實心藍色「+」 */
   .table-plus{
     flex:0 0 auto;
-    width:24px;height:24px;border-radius:50%;
-    border:1px solid var(--border);
-    background:var(--btn-grad);
-    color:#0b1220;
+    background:none;
+    border:none;
+    color:#3b82f6;                 /* 藍色實心字 */
     font-weight:900;
+    font-size:18px;
+    line-height:1;
+    padding:0 2px;
     display:inline-flex;align-items:center;justify-content:center;
     cursor:pointer;
   }
@@ -254,6 +266,11 @@ function buildGrid(){
       });
     }
 
+    // 人數顯示
+    const count = document.createElement('span');
+    count.className = 'head-count';
+    count.textContent = '0';
+
     // 右側 + 按鈕（點擊查看該格 Leader 的成員）
     const plus = document.createElement('button');
     plus.type = 'button';
@@ -266,7 +283,7 @@ function buildGrid(){
       else toast('此桌目前沒有 Leader');
     });
 
-    head.append(input, plus);
+    head.append(input, count, plus);
 
     const drop = document.createElement('div'); drop.className='drop';
     cell.append(head, drop);
@@ -307,11 +324,19 @@ function getLeaderAtCell(idx){
   for(const [L, pos] of state.pos){ if(pos.type==='cell' && pos.idx===idx) return L; }
   return '';
 }
+function updateCellCount(idx){
+  const cell = $(`.cell[data-idx="${idx}"]`); if(!cell) return;
+  const L = getLeaderAtCell(idx);
+  const cnt = L ? (state.membersByLeader.get(L)?.length || 0) : 0;
+  const badge = cell.querySelector('.head-count');
+  if (badge) badge.textContent = String(cnt);
+}
 function renderCellLeader(idx){
   const cell = $(`.cell[data-idx="${idx}"]`); if(!cell) return;
   const drop = cell.querySelector('.drop'); drop.innerHTML='';
   const L = getLeaderAtCell(idx);
   if(L){ drop.appendChild(makePill(L)); }
+  updateCellCount(idx);
 }
 
 /***** (10) Drop 到 Cell 的邏輯（覆蓋/交換） *****/
