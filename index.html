@@ -1,4 +1,4 @@
-<!doctype html> 
+<!doctype html>  
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8" />
@@ -62,7 +62,7 @@
   }
   .pill .dot::after{ content:none; }
 
-  /* Grid —— 讓格子高度更薄，貼近 pill 高度 */
+  /* Grid —— 兩行：一行桌名、一行桌長（避免重疊） */
   .grid-wrap{margin-top:12px}
   .grid{
     --w: var(--colw);
@@ -71,29 +71,24 @@
   }
   .cell{
     border:1px solid var(--border);border-radius:12px;
-    padding:4px 6px;                 /* ↓ 縮小內距 */
+    padding:4px 6px;                 /* 縮小內距 */
     background:var(--card);position:relative;
   }
-  .cell .head{display:flex;align-items:center;gap:6px;margin-bottom:2px;min-height:0;}
+  .cell .head{
+    display:flex;align-items:center;gap:6px;
+    margin-bottom:4px;               /* 與第二行（drop）留距 */
+    min-height:0;
+  }
   .table-name{
-    width:100%;padding:2px 6px;      /* ↓ 小尺寸輸入框 */
+    width:100%;padding:2px 6px;      /* 小尺寸輸入框 */
     border-radius:8px;border:1px solid #2b3244;background:#0f1117;color:#e5e7eb;
     font-size:12px;height:24px;line-height:20px;
   }
   .table-name[readonly]{opacity:.95;font-weight:700;}
 
-  /* 固定桌名：用角落小 badge，不讓它撐高格子 */
-  .table-badge{
-    position:absolute;top:4px;left:6px;
-    font-size:11px;line-height:16px;height:18px;
-    padding:0 6px;border-radius:7px;background:#0f1117;color:#e5e7eb;border:1px solid #2b3244;
-    pointer-events:none;opacity:.95;
-  }
-  .cell.fixed-name .head{display:none;}      /* 固定桌名時，隱藏輸入列 */
-  .cell.fixed-name .drop{margin-top:0;}      /* 不留多餘空白 */
-
+  /* 第二行：專放 Leader pill，不與桌名重疊 */
   .drop{
-    min-height:22px;                 /* ↓ 讓內容區更薄（接近 pill 高） */
+    min-height:22px;                 /* 接近 pill 高度 */
     display:flex;align-items:center;flex-wrap:wrap;gap:6px
   }
   .cell[data-dropzone="cell"]{outline-offset:-2px}
@@ -245,13 +240,6 @@ function buildGrid(){
       input.dataset.fixed = '1';
       input.title = '固定桌名（由主控設定）';
       head.appendChild(input);
-
-      // ★ 固定桌名：使用角落 badge，不讓輸入框撐高格子
-      const badge = document.createElement('div');
-      badge.className = 'table-badge';
-      badge.textContent = input.value;
-      cell.classList.add('fixed-name');
-      cell.appendChild(badge);
     } else {
       input.value = getTableName(i);
       input.addEventListener('input', () => {
@@ -381,7 +369,7 @@ function mapTableNamesToIdx() {
   const map = new Map();
   for (const cell of cells) {
     const idx = parseInt(cell.dataset.idx, 10);
-    const tn = cell.querySelector('.table-name')?.value?.trim() || cell.querySelector('.table-badge')?.textContent?.trim() || '';
+    const tn = cell.querySelector('.table-name')?.value?.trim() || '';
     if (tn) map.set(normKey(tn), idx);
   }
   return map;
@@ -429,7 +417,7 @@ async function saveAll(){
   const cells = $$('.cell');
   for(const cell of cells){
     const idx = parseInt(cell.dataset.idx,10);
-    const tn = (cell.querySelector('.table-name')?.value || cell.querySelector('.table-badge')?.textContent || '').trim();
+    const tn = (cell.querySelector('.table-name')?.value || '').trim();
     const L = getLeaderAtCell(idx);
 
     if(!tn || !L) continue;
