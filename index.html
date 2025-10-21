@@ -337,9 +337,8 @@ function updateCellCount(idx){
 }
 function updateHeadExtras(idx){
   const cell = $(`.cell[data-idx="${idx}"]`); if(!cell) return;
-  const hasName = !!(cell.querySelector('.table-name')?.value || '').trim();
-  const hasLeader = !!getLeaderAtCell(idx);
-  const show = hasName || hasLeader;
+  const hasLeader = !!getLeaderAtCell(idx);        // ★ 僅有 Leader 才顯示
+  const show = hasLeader;
   const countEl = cell.querySelector('.head-count');
   const plusEl  = cell.querySelector('.table-plus');
   if (countEl) countEl.style.display = show ? '' : 'none';
